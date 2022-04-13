@@ -165,19 +165,23 @@ impl FeatureManager {
 		}
 
 		// load the feature
-		let json = read_to_string(format!("static/features/{}", feature_name))
-			.await
-			.unwrap();
-		let feature = serde_json::from_str::<Feature>(&json);
+		let json = match read_to_string(format!("static/features/{}", feature_name)).await {
+			Ok(json) => json,
+			Err(e) => {
+				eprintln!("{}", e);
+				return;
+			}
+		};
 
-		// log any failed parsing
-		if let Err(e) = feature {
-			eprintln!("{}", e);
-			return;
-		}
+		let feature = match serde_json::from_str::<Feature>(&json) {
+			Ok(feature) => feature,
+			Err(e) => {
+				eprintln!("{}", e);
+				return;
+			}
+		};
 
 		// cache the result
-		let feature = feature.unwrap();
 		self.cache.insert(feature_name.to_string(), feature);
 
 		// update the loading progress
@@ -206,13 +210,21 @@ impl FeatureManager {
 		self.load_progress.lock().deref().is_done()
 	}
 
-	pub fn get_feature(
-		self: Arc<Self>,
-		feature_name: &str,
-	) -> impl Future<Output = Option<Feature>> {
-		FeatureFuture {
-			feature_manager: self,
-			feature_name: feature_name.to_string(),
+	pub async fn get_feature(self: Arc<Self>, feature_name: &str) -> Option<Feature> {
+		let feature_loading: bool = match self.load_progress.lock().deref() {
+			LoadProgress::Done => return self.cache.get(feature_name).as_deref().cloned(),
+			LoadProgress::Loading(tasks) => tasks.contains(feature_name),
+		};
+
+		if feature_loading {
+			FeatureFuture {
+				feature_manager: self,
+				feature_name: feature_name.to_string(),
+			}
+			.await
+		} else {
+			self.load_feature(feature_name).await;
+			self.cache.get(feature_name).as_deref().cloned()
 		}
 	}
 }

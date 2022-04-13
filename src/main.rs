@@ -1,5 +1,3 @@
-#![feature(let_chains)]
-
 use actix_web::{web::Data, App, HttpServer};
 
 mod managers;
