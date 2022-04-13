@@ -196,22 +196,23 @@ impl FeatureManager {
 		}
 	}
 
-	pub async fn all_features(self: Arc<Self>) -> Box<[Feature]> {
+	pub fn all_features(self: Arc<Self>) -> impl Future<Output = Box<[Feature]>> {
 		FeatureListFuture {
-			feature_manager: self.clone(),
+			feature_manager: self,
 		}
-		.await
 	}
 
 	pub fn is_done_loading(&self) -> bool {
 		self.load_progress.lock().deref().is_done()
 	}
 
-	pub async fn get_feature(self: Arc<Self>, feature_name: &str) -> Option<Feature> {
+	pub fn get_feature(
+		self: Arc<Self>,
+		feature_name: &str,
+	) -> impl Future<Output = Option<Feature>> {
 		FeatureFuture {
-			feature_manager: self.clone(),
+			feature_manager: self,
 			feature_name: feature_name.to_string(),
 		}
-		.await
 	}
 }
